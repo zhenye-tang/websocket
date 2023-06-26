@@ -964,20 +964,9 @@ int websocket_connect(struct websocket_session *session, const char *url, const 
     if (res == WEBSOCKET_OK)
         res = websocket_recv_and_check_hand_frame(session);
 
-    if (path != NULL)
-    {
-        ws_free(path);
-    }
-
-    if (host != NULL)
-    {
-        ws_free(host);
-    }
-
-    if (port != NULL)
-    {
-        ws_free(port);
-    }
+    ws_free(path);
+    ws_free(host);
+    ws_free(port);
 
     if (res != WEBSOCKET_OK)
     {
