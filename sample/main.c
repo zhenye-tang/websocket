@@ -1,8 +1,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
 #include "websocket.h"
-#include "signal.h"
+#include "mbedtls/aes.h"
 
 #define CMDLINE_MAX     (200)
 static struct websocket_session session;

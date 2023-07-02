@@ -11,6 +11,9 @@ else()
     message("do not use mbedtls")
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_definitions(-DWEBSOCKET_USING_MBED_TLS)
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/crypt)
 include_directories(${PROJECT_SOURCE_DIR}/inc)
 

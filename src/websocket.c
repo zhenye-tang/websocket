@@ -6,14 +6,13 @@
  * 2023-1-4      tzy          first implementation
  * 2023-6-24     tzy          modify url praser
  */
-
-#include "websocket.h"
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include "websocket.h"
 
 #define WEBSOCKET_TLS_BUFFER_SIZE                (2048)
 #define WEBSOCKET_CACHE_BUFFER_SIZE              (512)
@@ -50,13 +49,21 @@ enum HEADER_CHECK
 
 static int websocket_send(struct websocket_session *session, const void *buf, size_t len, int flags)
 {
-    //TODO tls support
+    if (session->tls_session)
+    {
+        return mbedtls_client_write(session->tls_session, buf, len);
+    }
+
     return send(session->socket_fd, buf, len, flags);
 }
 
 static int websocket_recv(struct websocket_session *session, void *buf, size_t len, int flags)
 {
-    //TODO tls support
+    if (session->tls_session)
+    {
+        return mbedtls_client_read(session->tls_session, buf, len);
+    }
+
     return recv(session->socket_fd, buf, len, flags);
 }
 
@@ -107,12 +114,14 @@ static void websocket_mask_data(void *encode_buf, const void *buf, uint32_t *mas
 #define TOO_SMALL(LEN)  ((LEN) < BIGBLOCKSIZE)
 
     char *dst_ptr = (char *)encode_buf;
-    const char *src_ptr = (const char *)buf;
+    char *src_ptr = (char *)buf;
+
     uint32_t *aligned_dst;
     uint32_t *aligned_src;
     int len = length;
 
-    if (!TOO_SMALL(len) && !UNALIGNED(buf, encode_buf))
+    /* On a 64-bit machine, point to uint32_t may overflow, So there's a warning. But mask_key is 4 bytes.*/
+    if (!TOO_SMALL(len) && !UNALIGNED(src_ptr, dst_ptr))
     {
         aligned_dst = (uint32_t *)dst_ptr;
         aligned_src = (uint32_t *)src_ptr; 
@@ -340,12 +349,10 @@ static const char *websocket_wrl_praser_path(const char *host_addr, size_t *path
     return *path_len ? (start) : NULL;
 }
 
-int websocket_url_praser(const char *url, char **host, char **port, char **path, int* is_wss)
+static const char *websocket_wrl_praser_wss(const char *url, int* is_wss)
 {
-    int ret = -WEBSOCKET_ERROR;
-    const char *host_addr, *port_addr, *path_addr, *port_def = "80";
-    size_t host_len = 0, port_len = 0, path_len = 0;
-
+    const char *host_addr = NULL;
+    *is_wss = 0;
     if(strncmp(url, "ws://", 5) == 0)
     {
         host_addr = url + 5;
@@ -354,17 +361,22 @@ int websocket_url_praser(const char *url, char **host, char **port, char **path,
     else if(strncmp(url, "wss://", 6) == 0)
     {
         host_addr = url + 6;
-        port_def = "443";
         *is_wss = 1;
     }
-    else
-    {
-        return ret;
-    }
+    return host_addr ? host_addr : NULL;
+}
 
-    host_addr = websocket_wrl_praser_host(host_addr, &host_len);
+int websocket_url_praser(const char *url, char **host, char **port, char **path, int* is_wss)
+{
+    int ret = -WEBSOCKET_ERROR;
+    const char *host_addr = NULL, *port_addr = NULL, *path_addr = NULL, *port_def = "80";
+    size_t host_len = 0, port_len = 0, path_len = 0;
+
+    host_addr = websocket_wrl_praser_host(websocket_wrl_praser_wss(url, is_wss), &host_len);
     port_addr = websocket_wrl_praser_port(host_addr, &port_len);
     path_addr = websocket_wrl_praser_path(host_addr, &path_len);
+
+    port_def = *is_wss ? "443" : port_def;
     port_addr = port_len ? port_addr : port_def;
 
     if(host_addr && path_addr)
@@ -658,6 +670,24 @@ static int websocket_recv_and_check_hand_frame(struct websocket_session *session
 static int webscoket_tls_init(struct websocket_session *session)
 {
     const char *pers = "websocket";
+    session->tls_session = (MbedTLSSession *)ws_malloc(sizeof(MbedTLSSession));
+    if (session->tls_session == NULL)
+    {
+        return -WEBSOCKET_NOMEM;
+    }
+
+    session->tls_session->buffer_len = WEBSOCKET_TLS_BUFFER_SIZE;
+    session->tls_session->buffer = ws_malloc(session->tls_session->buffer_len);
+    if (session->tls_session->buffer == NULL)
+    {
+        return -WEBSOCKET_ERROR;
+    }
+
+    if (mbedtls_client_init(session->tls_session, (void *)pers, strlen(pers)) < 0)
+    {
+        return -WEBSOCKET_ERROR;
+    }
+
     return WEBSOCKET_OK;
 }
 
@@ -857,11 +887,32 @@ static void websocket_recycle_resources(struct websocket_session *session)
 
 static int websocket_using_tls(struct websocket_session *session, const char *port, const char *host)
 {
-    int res = -WEBSOCKET_ERROR;
-#ifdef WEBSOCKET_USING_MBED_TLS
-    webscoket_tls_init(session);
-    /* TODO: use tls connect server */
-#endif
+    int res = WEBSOCKET_OK;
+    if (webscoket_tls_init(session) < 0)
+    {
+        return -WEBSOCKET_ERROR;
+    }
+    session->is_tls = 1;
+
+    if (session->tls_session)
+    {
+        session->tls_session->port = ws_strdup(port);
+        session->tls_session->host = ws_strdup(host);
+        if (session->tls_session->port == NULL || session->tls_session->host == NULL)
+        {
+            res = -WEBSOCKET_NOMEM;
+        }
+
+        if (res == WEBSOCKET_OK)
+            res = mbedtls_client_context(session->tls_session);
+
+        if (res == WEBSOCKET_OK)
+            res = mbedtls_client_connect(session->tls_session);
+
+        if (res == WEBSOCKET_OK)
+            session->socket_fd = session->tls_session->server_fd.fd;
+    }
+
     return res;
 }
 
@@ -904,12 +955,12 @@ static int websocket_connect_server(struct websocket_session *session, const cha
 
 int websocket_disconnect(struct websocket_session *session)
 {
-#ifdef WEBSOCKET_USING_MBED_TLS
     if (session->tls_session)
     {
-        /* TODO: free tls resources */
+        mbedtls_client_close(session->tls_session);
+        session->socket_fd = -1;
     }
-#endif
+
     if (session->socket_fd >= 0)
     {
         close(session->socket_fd);
@@ -927,6 +978,7 @@ int websocket_connect(struct websocket_session *session, const char *url, const 
     char *path = NULL;
     char *host = NULL;
     int is_wss = 0;
+
     if (session->cache == NULL)
     {
         session->cache = ws_malloc(WEBSOCKET_CACHE_BUFFER_SIZE);
@@ -949,9 +1001,7 @@ int websocket_connect(struct websocket_session *session, const char *url, const 
     {
         if (is_wss)
         {
-#ifdef WEBSOCKET_USING_MBED_TLS
             res = websocket_using_tls(session, (const char *)port, (const char *)host);
-#endif
         }
     }
 

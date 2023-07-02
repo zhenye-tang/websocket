@@ -14,6 +14,7 @@
 
 #include <netdb.h>
 #include <sys/socket.h>
+#include "tls_client.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -94,7 +95,7 @@ struct websocket_session
     size_t head_len;
     unsigned char key[36];
     struct websocket_frame_info info;
-    void *tls_session;
+    MbedTLSSession *tls_session;
 };
 
 int websocket_session_init(struct websocket_session *session);
