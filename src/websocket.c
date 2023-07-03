@@ -328,9 +328,13 @@ static const char *websocket_wrl_praser_port(const char *host_addr, size_t *post
             {
                 *post_len = end - start - 1;
             }
+            else
+            {
+                *post_len = strlen(start) - 1;
+            }
         }
     }
-    return *post_len ? (start+1) : NULL;
+    return *post_len ? (start + 1) : NULL;
 }
 
 static const char *websocket_wrl_praser_path(const char *host_addr, size_t *path_len)
@@ -344,9 +348,14 @@ static const char *websocket_wrl_praser_path(const char *host_addr, size_t *path
         {
             *path_len = strlen(start);
         }
+        else
+        {
+            *path_len = 1;
+            start = "/";
+        }
     }
 
-    return *path_len ? (start) : NULL;
+    return *path_len ? (start) : "/";
 }
 
 static const char *websocket_wrl_praser_wss(const char *url, int* is_wss)
@@ -387,7 +396,7 @@ int websocket_url_praser(const char *url, char **host, char **port, char **path,
         if(port_len)
         {
             *port = ws_malloc(port_len+1);
-            ws_memcpy((void *)*port, port_addr, path_len);
+            ws_memcpy((void *)*port, port_addr, port_len);
             *((*port)+port_len) = '\0';
         }
         else
