@@ -20,8 +20,13 @@ include_directories(${PROJECT_SOURCE_DIR}/inc)
 add_executable(${CMAKE_PROJECT_NAME} 
             ./sample/main.c
             ./src/websocket.c
+            ./src/websocket_service.c
             ./port/websocket_port.c
             )
 
+
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(${CMAKE_PROJECT_NAME} Threads::Threads)
 target_link_libraries(${CMAKE_PROJECT_NAME} tinycrypt)
 target_link_libraries(${CMAKE_PROJECT_NAME} mbedtls)
