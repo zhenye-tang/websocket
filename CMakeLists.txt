@@ -11,6 +11,7 @@ else()
     message("do not use mbedtls")
 endif()
 
+add_compile_options(-Wall -g -O0)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_definitions(-DWEBSOCKET_USING_MBED_TLS)
 

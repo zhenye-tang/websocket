@@ -339,7 +339,7 @@ static const char *websocket_wrl_praser_port(const char *host_addr, size_t *post
 
 static const char *websocket_wrl_praser_path(const char *host_addr, size_t *path_len)
 {
-    const char *start, *end;
+    const char *start;
     *path_len = 0;
     if(host_addr)
     {
