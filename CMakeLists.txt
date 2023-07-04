@@ -21,6 +21,7 @@ add_executable(${CMAKE_PROJECT_NAME}
             ./sample/main.c
             ./src/websocket.c
             ./src/websocket_service.c
+            ./src/websocket_async.c
             ./port/websocket_port.c
             )
 

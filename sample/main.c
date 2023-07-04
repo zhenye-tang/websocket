@@ -2,72 +2,73 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
-#include "websocket.h"
-#include "mbedtls/aes.h"
+#include "websocket_service.h"
 
 #define CMDLINE_MAX     (200)
-static struct websocket_session session;
+static struct websocket ws;
 
 static void ctrl_c(int s)
 {
     printf("byby!!!\n");
-    websocket_send_close(&session, WEBSOCKET_STATUS_CLOSE_NORMAL, "byby!!", strlen("byby!!"));
-    websocket_disconnect(&session);
+    websocket_disconnect_server(&ws);
+    websocket_deinit(&ws);
     exit(0);
+}
+
+static int onmessage(struct websocket *ws)
+{
+    char buf[200];
+    int len = websocket_read(&ws->session, buf, 200);
+    buf[len] = '\0';
+    printf("onmessage recv:%s\n", buf);
+    return len;
+}
+
+static int onopen(struct websocket *ws)
+{
+    printf("connect websocket server success!!!\n");
+    return websocket_write(&ws->session,"hello server", strlen("hello server"), WEBSOCKET_TEXT_FRAME);   
 }
 
 int main(int argc, char *argv[])
 {
-    static char recv_buf[512];
     char cmdline[CMDLINE_MAX]= {0};
-    int len;
-    uint32_t recv_buf_len = sizeof(recv_buf);
-    uint32_t send_len;
-
     signal(SIGINT, ctrl_c);
 
-    websocket_session_init(&session);
-    websocket_header_fields_add(&session, "Origin: %s\r\n", "http://coolaf.com");
-    if (websocket_connect(&session, "ws://82.157.123.54:9010/ajaxchattest", NULL) != WEBSOCKET_OK)
-    {
-        fprintf(stderr, "websocket_connect error");
-        exit(1);
-    }
+    int err = websocket_init(&ws);
+    if(!err)
+        err = websocket_add_header(&ws, "Origin", "http://coolaf.com");
+    if(!err)
+        err = websocket_set_url(&ws, "ws://82.157.123.54:9010/ajaxchattest");
+    if(!err)
+        err = websocket_connect_server(&ws);
+    if(!err)
+        websocket_message_event(&ws, onmessage);
+    if(!err)
+        websocket_open_event(&ws, onopen);
 
-    while(1)
+    while(!err)
     {
         fgets(cmdline,CMDLINE_MAX,stdin);
         cmdline[strlen(cmdline)-1]='\0';
 
-        if (websocket_write(&session,cmdline, strlen(cmdline), WEBSOCKET_TEXT_FRAME) < 0)
+        if(strcmp(cmdline, "exit") == 0)
         {
-            fprintf(stderr,"write error, please check connect!!!\n");
-            exit(1);
+            websocket_disconnect_server(&ws);
+            websocket_deinit(&ws);
         }
         else
         {
-            printf("write [%s] success!!!!\n", cmdline);
-        }
-
-        do
-        {
-            websocket_get_block_info(&session);
-            if (session.info.remain_len != 0)
+            if (websocket_write(&ws.session,cmdline, strlen(cmdline), WEBSOCKET_TEXT_FRAME) < 0)
             {
-                send_len = recv_buf_len > session.info.remain_len ? session.info.remain_len : recv_buf_len;
-                if ((len = websocket_read(&session, recv_buf, send_len)) > 0)
-                {
-                    recv_buf[len] = '\0';
-                    printf("recv server message, message length = %d, content is: %s\n", len, recv_buf);
-                }
-                else
-                {
-                    fprintf(stderr,"read error!!!!!\n");
-                    exit(1);
-                }
+                fprintf(stderr,"write error, please check connect!!!\n");
+                exit(1);
+            }
+            else
+            {
+                printf("write [%s] success!!!!\n", cmdline);
             }
         }
-        while (session.info.is_slice || session.info.remain_len);
     }
 
     exit(0);
