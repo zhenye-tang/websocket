@@ -50,9 +50,7 @@ enum HEADER_CHECK
 static int websocket_send(struct websocket_session *session, const void *buf, size_t len, int flags)
 {
     if (session->tls_session)
-    {
         return mbedtls_client_write(session->tls_session, buf, len);
-    }
 
     return send(session->socket_fd, buf, len, flags);
 }
@@ -60,9 +58,7 @@ static int websocket_send(struct websocket_session *session, const void *buf, si
 static int websocket_recv(struct websocket_session *session, void *buf, size_t len, int flags)
 {
     if (session->tls_session)
-    {
         return mbedtls_client_read(session->tls_session, buf, len);
-    }
 
     return recv(session->socket_fd, buf, len, flags);
 }
@@ -679,25 +675,24 @@ static int websocket_recv_and_check_hand_frame(struct websocket_session *session
 static int webscoket_tls_init(struct websocket_session *session)
 {
     const char *pers = "websocket";
-    session->tls_session = (MbedTLSSession *)ws_malloc(sizeof(MbedTLSSession));
-    if (session->tls_session == NULL)
+    int success = (
+        (session) &&
+        (session->tls_session = (MbedTLSSession *)ws_malloc(sizeof(MbedTLSSession))) &&
+        (session->tls_session->buffer = ws_malloc(WEBSOCKET_TLS_BUFFER_SIZE)) &&
+        (session->tls_session->buffer_len = WEBSOCKET_TLS_BUFFER_SIZE)
+    );
+
+    if(success)
     {
-        return -WEBSOCKET_NOMEM;
+        if (mbedtls_client_init(session->tls_session, (void *)pers, strlen(pers)) < 0)
+            success = -WEBSOCKET_ERROR;
+    }
+    else
+    {
+        success = -WEBSOCKET_NOMEM;
     }
 
-    session->tls_session->buffer_len = WEBSOCKET_TLS_BUFFER_SIZE;
-    session->tls_session->buffer = ws_malloc(session->tls_session->buffer_len);
-    if (session->tls_session->buffer == NULL)
-    {
-        return -WEBSOCKET_ERROR;
-    }
-
-    if (mbedtls_client_init(session->tls_session, (void *)pers, strlen(pers)) < 0)
-    {
-        return -WEBSOCKET_ERROR;
-    }
-
-    return WEBSOCKET_OK;
+    return success == 1 ? WEBSOCKET_OK : success;
 }
 
 int websocket_get_block_info_raw(struct websocket_session *session)
@@ -781,28 +776,17 @@ int websocket_send_close(struct websocket_session *session, websocket_status_cod
     char send_length = 2;
     uint16_t statu_code = htons(status_code);
 
-    if (session == NULL)
-    {
+    if (session == NULL || session->socket_fd < 0)
         return -WEBSOCKET_ERROR;
-    }
-
-    if (session->socket_fd < 0)
-    {
-        return -WEBSOCKET_ERROR;
-    }
 
     if (buf != NULL)
-    {
         send_length += length;
-    }
 
     send_buf = session->cache + session->cache_len - send_length;
     ws_memcpy(send_buf, &statu_code, sizeof(statu_code));
 
     if (buf != NULL)
-    {
         ws_memcpy(send_buf + sizeof(statu_code), buf, length);
-    }
 
     return websocket_send_control_frame(session, WEBSOCKET_CLOSE_FRAME, (void *)send_buf, send_length);
 }
@@ -839,9 +823,7 @@ int websocket_write_slice(struct websocket_session *session, const void *buf, si
     char fin = 0;
 
     if ((opcode != WEBSOCKET_TEXT_FRAME) && (opcode != WEBSOCKET_BIN_FRAME))
-    {
         return -WEBSOCKET_WRITE_ERROR;
-    }
 
     if (slice_type == WEBSOCKET_WRITE_FIRST_SLICE)
     {
@@ -864,9 +846,7 @@ int websocket_write_slice(struct websocket_session *session, const void *buf, si
 int websocket_write(struct websocket_session *session, const void *buf, size_t length, websocket_frame_type_t opcode)
 {
     if ((opcode != WEBSOCKET_TEXT_FRAME) && (opcode != WEBSOCKET_BIN_FRAME))
-    {
         return -WEBSOCKET_WRITE_ERROR;
-    }
 
     return websocket_send_encode_package(session, buf, length, opcode, 1);
 }
@@ -882,29 +862,21 @@ int websocket_session_init(struct websocket_session *session)
 static void websocket_recycle_resources(struct websocket_session *session)
 {
     if (session->cache)
-    {
         ws_free(session->cache);
-    }
 
     if (session->subprotocol)
-    {
         ws_free(session->subprotocol);
-    }
 
     websocket_session_init(session);
 }
 
 static int websocket_using_tls(struct websocket_session *session, const char *port, const char *host)
 {
-    int res = WEBSOCKET_OK;
-    if (webscoket_tls_init(session) < 0)
-    {
-        return -WEBSOCKET_ERROR;
-    }
-    session->is_tls = 1;
+    int res = -WEBSOCKET_ERROR;
 
-    if (session->tls_session)
+    if ((res = webscoket_tls_init(session)) == WEBSOCKET_OK && session->tls_session)
     {
+        session->is_tls = 1;
         session->tls_session->port = ws_strdup(port);
         session->tls_session->host = ws_strdup(host);
         if (session->tls_session->port == NULL || session->tls_session->host == NULL)
@@ -1000,19 +972,11 @@ int websocket_connect(struct websocket_session *session, const char *url, const 
     }
 
     if (session->socket_fd > 0)
-    {
         return -WEBSOCKET_IS_CONNECT;
-    }
 
     res = websocket_url_praser(url, &host, &port, &path,&is_wss);
-
-    if (res == WEBSOCKET_OK)
-    {
-        if (is_wss)
-        {
-            res = websocket_using_tls(session, (const char *)port, (const char *)host);
-        }
-    }
+    if (res == WEBSOCKET_OK && is_wss)
+        res = websocket_using_tls(session, (const char *)port, (const char *)host);
 
     if (res == WEBSOCKET_OK && session->tls_session == NULL)
         res = websocket_connect_server(session, (const char *)port, (const char *)host);

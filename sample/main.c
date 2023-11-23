@@ -46,14 +46,20 @@ int main(int argc, char *argv[])
     char cmdline[CMDLINE_MAX]= {0};
     signal(SIGINT, ctrl_c);
 
-    int err = websocket_init(&ws);
-    err = err ? err : websocket_add_header(&ws, "Origin", "http://coolaf.com");
-    err = err ? err : websocket_set_url(&ws, "ws://82.157.123.54:9010/ajaxchattest");
-    err = err ? err : websocket_connect_server(&ws);
-    err ? err : websocket_message_event(&ws, onmessage);
-    err ? err : websocket_open_event(&ws, onopen);
+    int success = (
+        (websocket_init(&ws) == WEBSOCKET_OK) &&
+        (websocket_add_header(&ws, "Origin", "http://coolaf.com") == WEBSOCKET_OK) &&
+        (websocket_set_url(&ws, "ws://82.157.123.54:9010/ajaxchattest") == WEBSOCKET_OK) &&
+        (websocket_connect_server(&ws) == WEBSOCKET_OK)
+    );
 
-    while(!err)
+    if(success)
+    {
+        websocket_message_event(&ws, onmessage);
+        websocket_open_event(&ws, onopen);
+    }
+
+    while(success)
     {
         fgets(cmdline,CMDLINE_MAX,stdin);
         cmdline[strlen(cmdline)-1]='\0';

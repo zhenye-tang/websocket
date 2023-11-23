@@ -72,17 +72,13 @@ static struct websocket_kv *websocket_kv_find(struct websocket_kv_table *kv_tab,
     for(int i = 0; i < kv_tab->kv_use; i++)
     {
         if(kv_tab->kv_tab[i].key && !strcmp(kv_tab->kv_tab[i].key, key))
-        {
             return &kv_tab->kv_tab[i];
-        }
     }
 
     if(kv_tab->kv_use >= kv_tab->kv_total)
     {
         if(websocket_kv_table_alloc(kv_tab))
-        {
             kv = &kv_tab->kv_tab[kv_tab->kv_use];
-        }
     }
     else
     {
@@ -275,54 +271,45 @@ static int websocket_control_frame_handle(struct websocket *ws)
     int res = WEBSOCKET_OK;
     switch(info->frame_type)
     {
-        case WEBSOCKET_PING_FRAME:
-            if (info->remain_len > 0)
-            {
-                read_len = websocket_read(&ws->session, cache, info->remain_len);
-                if (read_len > 0)
-                {
-                    res = websocket_send_pong(&ws->session, cache, read_len);
-                }
-                else
-                {
-                    res = -WEBSOCKET_ERROR;
-                }
-            }
+    case WEBSOCKET_PING_FRAME:
+        if (info->remain_len > 0)
+        {
+            read_len = websocket_read(&ws->session, cache, info->remain_len);
+            if (read_len > 0)
+                res = websocket_send_pong(&ws->session, cache, read_len);
             else
+                res = -WEBSOCKET_ERROR;
+        }
+        else
+        {
+            res = websocket_send_pong(&ws->session, NULL, 0);
+        }
+        break;
+    case WEBSOCKET_PONG_FRAME:
+        if (info->remain_len > 0)
+        {
+            res = websocket_read(&ws->session, cache, info->remain_len);
+        }
+        break;
+    case WEBSOCKET_CLOSE_FRAME:
+        if (info->remain_len > 0)
+        {
+            read_len = websocket_read(&ws->session, cache, info->remain_len);
+            if (read_len <= 0)
             {
-                res = websocket_send_pong(&ws->session, NULL, 0);
+                res = -WEBSOCKET_ERROR;
+                break;
             }
-            break;
-        case WEBSOCKET_PONG_FRAME:
-            if (info->remain_len > 0)
-            {
-                res = websocket_read(&ws->session, cache, info->remain_len);
-            }
-            break;
-        case WEBSOCKET_CLOSE_FRAME:
-            if (info->remain_len > 0)
-            {
-                read_len = websocket_read(&ws->session, cache, info->remain_len);
-                if (read_len <= 0)
-                {
-                    res = -WEBSOCKET_ERROR;
-                    break;
-                }
+            cache[read_len] = '\0';
 
-                cache[read_len] = '\0';
-
-                if (read_len > 2)
-                {
-                    websocket_send_close(&ws->session, WEBSOCKET_STATUS_CLOSE_NORMAL, &cache[2], read_len - 2);
-                }
-                else
-                {
-                    websocket_send_close(&ws->session, WEBSOCKET_STATUS_CLOSE_NORMAL, NULL, 0);
-                }
-            }
-            break;
-        default:
-            break;
+            if (read_len > 2)
+                websocket_send_close(&ws->session, WEBSOCKET_STATUS_CLOSE_NORMAL, &cache[2], read_len - 2);
+            else
+                websocket_send_close(&ws->session, WEBSOCKET_STATUS_CLOSE_NORMAL, NULL, 0);
+        }
+        break;
+    default:
+        break;
     }
 
     return res;
@@ -398,31 +385,23 @@ int websocket_write_data(struct websocket *ws, struct websocket_frame *frame)
 void websocket_message_event(struct websocket *ws, int (*onmessage)(struct websocket *ws))
 {
     if(ws)
-    {
         ws->callback.onmessage = onmessage;
-    }
 }
 
 void websocket_open_event(struct websocket *ws, int (*onopen)(struct websocket *ws))
 {
     if(ws)
-    {
         ws->callback.onopen = onopen;
-    }
 }
 
 void websocket_close_event(struct websocket *ws, int (*onclose)(struct websocket *ws))
 {
     if(ws)
-    {
         ws->callback.onclose = onclose;
-    }
 }
 
 void websocket_error_event(struct websocket *ws, int (*onerror)(struct websocket *ws))
 {
     if(ws)
-    {
         ws->callback.onerror = onerror;
-    }
 }
