@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include "websocket.h"
+#include "tls_client.h"
 
 #define WEBSOCKET_TLS_BUFFER_SIZE                (2048)
 #define WEBSOCKET_CACHE_BUFFER_SIZE              (512)
@@ -678,8 +679,8 @@ static int webscoket_tls_init(struct websocket_session *session)
     int success = (
         (session) &&
         (session->tls_session = (MbedTLSSession *)ws_malloc(sizeof(MbedTLSSession))) &&
-        (session->tls_session->buffer = ws_malloc(WEBSOCKET_TLS_BUFFER_SIZE)) &&
-        (session->tls_session->buffer_len = WEBSOCKET_TLS_BUFFER_SIZE)
+        (((MbedTLSSession *)session->tls_session)->buffer = ws_malloc(WEBSOCKET_TLS_BUFFER_SIZE)) &&
+        (((MbedTLSSession *)session->tls_session)->buffer_len = WEBSOCKET_TLS_BUFFER_SIZE)
     );
 
     if(success)
@@ -877,9 +878,9 @@ static int websocket_using_tls(struct websocket_session *session, const char *po
     if ((res = webscoket_tls_init(session)) == WEBSOCKET_OK && session->tls_session)
     {
         session->is_tls = 1;
-        session->tls_session->port = ws_strdup(port);
-        session->tls_session->host = ws_strdup(host);
-        if (session->tls_session->port == NULL || session->tls_session->host == NULL)
+        ((MbedTLSSession *)session->tls_session)->port = ws_strdup(port);
+        ((MbedTLSSession *)session->tls_session)->host = ws_strdup(host);
+        if (((MbedTLSSession *)session->tls_session)->port == NULL || ((MbedTLSSession *)session->tls_session)->host == NULL)
         {
             res = -WEBSOCKET_NOMEM;
         }
@@ -891,7 +892,7 @@ static int websocket_using_tls(struct websocket_session *session, const char *po
             res = mbedtls_client_connect(session->tls_session);
 
         if (res == WEBSOCKET_OK)
-            session->socket_fd = session->tls_session->server_fd.fd;
+            session->socket_fd = ((MbedTLSSession *)session->tls_session)->server_fd.fd;
     }
 
     return res;

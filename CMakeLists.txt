@@ -1,39 +1,31 @@
-
 cmake_minimum_required(VERSION 3.21)
 
 project(websocket)
 
-# Set cmake input parameters
-option(WEBSOCKET_USING_MBED_TLS "Use the mbedtls library to support wss"  OFF)
-if (WEBSOCKET_USING_MBED_TLS)
-    add_definitions(-DWEBSOCKET_USING_MBED_TLS)
-    message("Use the mbedtls library to support wss")
-else()
-    message("do not use mbedtls")
-endif()
+include(cmake/cross-compile.cmake)
 
-# Set compilation parameters
-add_compile_options(-Wall -g -O0)
-# Generate compile_commands.json
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# Customize definition
-add_definitions(-DWEBSOCKET_USING_MBED_TLS)
-# Add subdirectory to search path
-add_subdirectory(${PROJECT_SOURCE_DIR}/crypt)
-add_subdirectory(${PROJECT_SOURCE_DIR}/src)
-
+set(CMAKE_INSTALL_PREFIX dist)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(ARCH "" CACHE STRING "Specify the target platform architecture")
 
-# Generate executable
-add_executable(${CMAKE_PROJECT_NAME} 
-            ./sample/main.c
-            ./port/websocket_port.c
-            )
+option(USING_ASAN "Enable AddressSanitizer" OFF)
+option(USING_COVERAGE "Enable code coverage" OFF)
 
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-target_link_libraries(${CMAKE_PROJECT_NAME} Threads::Threads)
-target_link_libraries(${CMAKE_PROJECT_NAME} tinycrypt)
-target_link_libraries(${CMAKE_PROJECT_NAME} websocket-core)
+if(USING_ASAN)
+add_compile_options(-fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined)
+add_link_options(-fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined)
+endif()
+
+if(USING_COVERAGE)
+add_compile_options(--coverage)
+add_link_options(--coverage)
+# use lcov generate coverage report
+# lcov -c -d . cover.info && genhtml cover.info -o coverage_report
+endif()
+
+add_subdirectory(sample)
+add_subdirectory(crypt)
+add_subdirectory(core)
