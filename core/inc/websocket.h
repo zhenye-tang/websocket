@@ -12,9 +12,12 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <netdb.h>
 #include <sys/socket.h>
-#include "tls_client.h"
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -95,7 +98,7 @@ struct websocket_session
     size_t head_len;
     unsigned char key[36];
     struct websocket_frame_info info;
-    MbedTLSSession *tls_session;
+    void *tls_session;
 };
 
 int websocket_session_init(struct websocket_session *session);

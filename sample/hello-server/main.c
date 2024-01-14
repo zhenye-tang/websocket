@@ -2,22 +2,21 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
+#include <unistd.h>
 #include "websocket_service.h"
 
 #define CMDLINE_MAX     (200)
-static struct websocket ws;
+static struct app_websocket ws;
+static const char *fram_map[11] = {"continue", "text", "bin", "", "", "","", "", "close", "ping", "pong"};
 
 static void ctrl_c(int s)
 {
     printf("byby!!!\n");
     websocket_disconnect_server(&ws);
-    websocket_deinit(&ws);
     exit(0);
 }
 
-static const char *fram_map[11] = {"continue", "text", "bin", "", "", "","", "", "close", "ping", "pong"};
-
-static int onmessage(struct websocket *ws)
+static int onmessage(struct app_websocket *ws)
 {
     struct websocket_frame frame;
     int len = websocket_read_data(ws, &frame);
@@ -32,19 +31,32 @@ static int onmessage(struct websocket *ws)
         printf("recv error!!!!!!!\n");
     }
 
-    return len;
+    return WEBSOCKET_OK;
 }
 
-static int onopen(struct websocket *ws)
+static int onopen(struct app_websocket *ws)
 {
     printf("connect websocket server success!!!\n");
-    return websocket_write(&ws->session,"hello server", strlen("hello server"), WEBSOCKET_TEXT_FRAME);   
+    struct websocket_frame frame;
+    frame.data = "hello server";
+    frame.length = strlen("hello server");
+    frame.type = WEBSOCKET_TEXT_FRAME;
+
+    return websocket_write_data(ws, &frame); 
+}
+
+static int onclose(struct app_websocket *ws)
+{
+    printf("server close session!!!\n");
+    return 0;
 }
 
 int main(int argc, char *argv[])
 {
     char cmdline[CMDLINE_MAX]= {0};
     signal(SIGINT, ctrl_c);
+
+    websocket_worker_init();
 
     int success = (
         (websocket_init(&ws) == WEBSOCKET_OK) &&
@@ -57,6 +69,7 @@ int main(int argc, char *argv[])
     {
         websocket_message_event(&ws, onmessage);
         websocket_open_event(&ws, onopen);
+        websocket_close_event(&ws, onclose);
     }
 
     while(success)
@@ -67,7 +80,8 @@ int main(int argc, char *argv[])
         if(strcmp(cmdline, "exit") == 0)
         {
             websocket_disconnect_server(&ws);
-            websocket_deinit(&ws);
+            sleep(1);
+            success = 0;
         }
         else
         {
