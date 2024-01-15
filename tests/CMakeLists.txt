@@ -25,6 +25,5 @@ subdir_list(SUBDIRS ${CMAKE_CURRENT_LIST_DIR})
 foreach (subdir ${SUBDIRS})
   if (NOT ("${subdir}" STREQUAL "common")) #公共目录，这个目录可以添加一些功能，供其他测试用例使用
     add_subdirectory(${subdir})
-    message(STATUS ${subdir}) 
   endif ()
 endforeach ()
