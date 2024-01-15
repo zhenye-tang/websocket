@@ -30,11 +30,9 @@ endif ()
 
 #设置编译器路径
 set(CMAKE_C_COMPILER ${ARM_TOOLCHAIN_DIR}/${TOOLCHAIN_PREFIX}gcc${TOOLCHAIN_SUFFIX})
+# cmake 会自己运行一个叫做 "try_compile" 命令，
+# 用于确定编译器是正常工作的，这里设置尝试编译生成目标，交叉编译一般需要更新设置这个变量
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
-#用于设置可执行文件名末尾的后缀
-set(CMAKE_EXECUTABLE_SUFFIX_C .elf)
-set(CMAKE_EXECUTABLE_SUFFIX_CXX .elf)
-set(CMAKE_EXECUTABLE_SUFFIX_ASM .elf)
 #设置 C 编译器编译选项
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_FLAGS}")
 #设置 C++ 编译器编译选项
@@ -43,7 +41,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_FLAGS}")
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -x assembler-with-cpp ${ARCH_FLAGS}")
 #设置链接选项
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections -nostdlib ${ARCH_FLAGS}")
-# 设置编译器相关库文件的变更，比如编译器自带的c库，由于是交叉编译，因此需要设置这个路径，默认路径是 /usr/lib 等
+# 由于是交叉编译，编译器路径是变了的，编译器下相关的库路径也是变了的
+# 这里重新设置 cmake 查找路径，这样 cmake 会从这个位置查找相关库文件，以进行编译链接
+# 这里找不到会去 usr/lib 等目录下找
 set(CMAKE_FIND_ROOT_PATH ${BINUTILS_PATH})
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)

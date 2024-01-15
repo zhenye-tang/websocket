@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(websocket)
-
 include(cmake/cross-compile.cmake)
+
+project(websocket)
 
 set(CMAKE_INSTALL_PREFIX dist)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -29,3 +29,5 @@ endif()
 add_subdirectory(sample)
 add_subdirectory(crypt)
 add_subdirectory(core)
+add_subdirectory(third_party)
+add_subdirectory(tests)
