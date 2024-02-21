@@ -23,7 +23,8 @@ if(USING_COVERAGE)
 add_compile_options(--coverage)
 add_link_options(--coverage)
 # use lcov generate coverage report
-# lcov -c -d . cover.info && genhtml cover.info -o coverage_report
+# lcov -c -d . -o coverage.info
+# genhtml coverage.info -o coverage_report
 endif()
 
 add_subdirectory(sample)
