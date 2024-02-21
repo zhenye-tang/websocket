@@ -12,14 +12,14 @@ static const char *fram_map[11] = {"continue", "text", "bin", "", "", "","", "",
 static void ctrl_c(int s)
 {
     printf("byby!!!\n");
-    websocket_disconnect_server(&ws);
+    app_websocket_disconnect_server(&ws);
     exit(0);
 }
 
 static int onmessage(struct app_websocket *ws)
 {
-    struct websocket_frame frame;
-    int len = websocket_read_data(ws, &frame);
+    struct app_websocket_frame frame;
+    int len = app_websocket_read_data(ws, &frame);
     if(len > 0)
     {
         printf("frame type is: %s frame, fram data is: %s.\n", fram_map[frame.type], (char *)frame.data);
@@ -37,12 +37,12 @@ static int onmessage(struct app_websocket *ws)
 static int onopen(struct app_websocket *ws)
 {
     printf("connect websocket server success!!!\n");
-    struct websocket_frame frame;
+    struct app_websocket_frame frame;
     frame.data = "hello server";
     frame.length = strlen("hello server");
     frame.type = WEBSOCKET_TEXT_FRAME;
 
-    return websocket_write_data(ws, &frame); 
+    return app_websocket_write_data(ws, &frame); 
 }
 
 static int onclose(struct app_websocket *ws)
@@ -55,21 +55,19 @@ int main(int argc, char *argv[])
 {
     char cmdline[CMDLINE_MAX]= {0};
     signal(SIGINT, ctrl_c);
-
-    websocket_worker_init();
-
+    app_websocket_worker_init();
     int success = (
-        (websocket_init(&ws) == WEBSOCKET_OK) &&
-        (websocket_add_header(&ws, "Origin", "http://coolaf.com") == WEBSOCKET_OK) &&
-        (websocket_set_url(&ws, "ws://82.157.123.54:9010/ajaxchattest") == WEBSOCKET_OK) &&
-        (websocket_connect_server(&ws) == WEBSOCKET_OK)
+        (app_websocket_init(&ws) == WEBSOCKET_OK) &&
+        (app_websocket_add_header(&ws, "Origin", "http://coolaf.com") == WEBSOCKET_OK) &&
+        (app_websocket_set_url(&ws, "ws://82.157.123.54:9010/ajaxchattest") == WEBSOCKET_OK) &&
+        (app_websocket_connect_server(&ws) == WEBSOCKET_OK)
     );
 
     if(success)
     {
-        websocket_message_event(&ws, onmessage);
-        websocket_open_event(&ws, onopen);
-        websocket_close_event(&ws, onclose);
+        app_websocket_message_event(&ws, onmessage);
+        app_websocket_open_event(&ws, onopen);
+        app_websocket_close_event(&ws, onclose);
     }
 
     while(success)
@@ -79,17 +77,17 @@ int main(int argc, char *argv[])
         printf("cmdline len = %ld\n", strlen(cmdline));
         if(strcmp(cmdline, "exit") == 0)
         {
-            websocket_disconnect_server(&ws);
+            app_websocket_disconnect_server(&ws);
             sleep(1);
             success = 0;
         }
         else
         {
-            struct websocket_frame frame;
+            struct app_websocket_frame frame;
             frame.data = cmdline;
             frame.length = strlen(cmdline);
             frame.type = WEBSOCKET_TEXT_FRAME;
-            if (websocket_write_data(&ws, &frame) < 0)
+            if (app_websocket_write_data(&ws, &frame) < 0)
             {
                 fprintf(stderr,"write error, please check connect!!!\n");
                 exit(1);

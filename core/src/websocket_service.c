@@ -65,7 +65,6 @@ struct app_websocket_client_status
     struct app_websocket_close_status status;
 };
 
-
 struct websocket
 {
     char *url;
@@ -415,7 +414,7 @@ static void *worker_entry(void *prma)
     return "byby";
 }
 
-int websocket_worker_init(void)
+int app_websocket_worker_init(void)
 {
     memset(&worker, 0, sizeof(worker));
     pipe(worker.pipe);
@@ -525,7 +524,7 @@ int websocket_kv_put(struct websocket_kv_table *kv_tab, const char *key, const c
     return res;
 }
 
-int websocket_init(struct app_websocket *websocket)
+int app_websocket_init(struct app_websocket *websocket)
 {
     int res = -WEBSOCKET_ERROR;
     char *cache_buf = NULL;
@@ -588,14 +587,14 @@ void websocket_deinit(struct app_websocket *websocket)
     }
 }
 
-int websocket_set_url(struct app_websocket *websocket, const char *url)
+int app_websocket_set_url(struct app_websocket *websocket, const char *url)
 {
     WEBSOCKET_FREE(websocket->websocket_session->url);
     websocket->websocket_session->url = WEBSOCKET_STRDUP(url);
     return websocket->websocket_session->url ? 0 : -1;
 }
 
-int websocket_set_subprotocol(struct app_websocket *websocket, const char *subprotocol)
+int app_websocket_set_subprotocol(struct app_websocket *websocket, const char *subprotocol)
 {
     WEBSOCKET_FREE(websocket->websocket_session->subprotocol);
     websocket->websocket_session->subprotocol = WEBSOCKET_STRDUP(subprotocol);
@@ -638,7 +637,7 @@ int app_websocket_get_close_reason(struct app_websocket *websocket, websocket_st
     return res;
 }
 
-int websocket_add_header(struct app_websocket *websocket, const char *key, const char *value)
+int app_websocket_add_header(struct app_websocket *websocket, const char *key, const char *value)
 {
     int err = WEBSOCKET_OK;
     if(!websocket->websocket_session->kv.kv_tab)
@@ -657,7 +656,7 @@ int websocket_add_header(struct app_websocket *websocket, const char *key, const
     return err;
 }
 
-int websocket_connect_server(struct app_websocket *websocket)
+int app_websocket_connect_server(struct app_websocket *websocket)
 {
     /* send message */
     struct websocket * ws = websocket->websocket_session;
@@ -669,7 +668,7 @@ int websocket_connect_server(struct app_websocket *websocket)
     return 0;
 }
 
-int websocket_disconnect_server(struct app_websocket *websocket)
+int app_websocket_disconnect_server(struct app_websocket *websocket)
 {
     struct websocket *ws = websocket->websocket_session;
     int err = app_websocket_enter_critical(ws);
@@ -887,7 +886,7 @@ static int app_websocket_recive_data(struct app_websocket *websocket)
     return res;
 }
 
-int websocket_read_data(struct app_websocket *websocket, struct websocket_frame *frame)
+int app_websocket_read_data(struct app_websocket *websocket, struct app_websocket_frame *frame)
 {
     struct websocket_frame_info *info;
     struct websocket_session *session = &websocket->websocket_session->session;
@@ -937,30 +936,30 @@ int websocket_read_data(struct app_websocket *websocket, struct websocket_frame 
     return res;
 }
 
-int websocket_write_data(struct app_websocket *websocket, struct websocket_frame *frame)
+int app_websocket_write_data(struct app_websocket *websocket, struct app_websocket_frame *frame)
 {
     return websocket_write(&websocket->websocket_session->session, frame->data, frame->length, frame->type);
 }
 
-void websocket_message_event(struct app_websocket *websocket, int (*onmessage)(struct app_websocket *ws))
+void app_websocket_message_event(struct app_websocket *websocket, int (*onmessage)(struct app_websocket *ws))
 {
     if(websocket && websocket->websocket_session)
         websocket->websocket_session->callback.onmessage = onmessage;
 }
 
-void websocket_open_event(struct app_websocket *websocket, int (*onopen)(struct app_websocket *ws))
+void app_websocket_open_event(struct app_websocket *websocket, int (*onopen)(struct app_websocket *ws))
 {
     if(websocket && websocket->websocket_session)
         websocket->websocket_session->callback.onopen = onopen;
 }
 
-void websocket_close_event(struct app_websocket *websocket, int (*onclose)(struct app_websocket *ws))
+void app_websocket_close_event(struct app_websocket *websocket, int (*onclose)(struct app_websocket *ws))
 {
     if(websocket && websocket->websocket_session)
         websocket->websocket_session->callback.onclose = onclose;
 }
 
-void websocket_error_event(struct app_websocket *websocket, int (*onerror)(struct app_websocket *ws))
+void app_websocket_error_event(struct app_websocket *websocket, int (*onerror)(struct app_websocket *ws))
 {
     if(websocket && websocket->websocket_session)
         websocket->websocket_session->callback.onerror = onerror;

@@ -105,7 +105,7 @@ static int websocket_send_nbytes(struct websocket_session *session, void *buf, s
 static void websocket_mask_data(void *encode_buf, const void *buf, uint32_t *mask_key, size_t length)
 {
 #define UNALIGNED(X, Y) \
-    (((uint32_t)X & (sizeof (uint32_t) - 1)) | ((uint32_t)Y & (sizeof (uint32_t) - 1)))
+    (((size_t)X & (sizeof (size_t) - 1)) | ((size_t)Y & (sizeof (size_t) - 1)))
 #define BIGBLOCKSIZE    (sizeof (uint32_t) << 2)
 #define LITTLEBLOCKSIZE (sizeof (uint32_t))
 #define TOO_SMALL(LEN)  ((LEN) < BIGBLOCKSIZE)
@@ -117,8 +117,7 @@ static void websocket_mask_data(void *encode_buf, const void *buf, uint32_t *mas
     uint32_t *aligned_src;
     int len = length;
 
-    /* On a 64-bit machine, point to uint32_t may overflow, So there's a warning. But mask_key is 4 bytes.*/
-    if (!TOO_SMALL(len) && !UNALIGNED(src_ptr, dst_ptr))
+    if (!TOO_SMALL(len) && !UNALIGNED(src_ptr, dst_ptr)) 
     {
         aligned_dst = (uint32_t *)dst_ptr;
         aligned_src = (uint32_t *)src_ptr; 
@@ -206,6 +205,7 @@ static int websocket_get_payload_len(struct websocket_session *session, struct w
     else if (data_length == 126)
     {
         uint16_t payload_len = 0;
+        /* read two bytes again */
         if ((data_length = websocket_recv_nbytes(session, &payload_len, 2, 0)) <= 0)
         {
             res = -WEBSOCKET_READ_ERROR;
@@ -507,19 +507,16 @@ static int websocket_send_hand_frame(struct websocket_session *session, const ch
         "Upgrade: websocket\r\n"
         "Sec-WebSocket-Version: 13\r\n";
 
+    /* Move user-defined header to buffer tail */
     ws_memmove(session->cache + session->cache_len - session->head_len, session->cache, session->head_len);
     remain_len = (int)(session->cache_len - session->head_len);
 
     head_len += websocket_snprintf(&ptr, &remain_len, http_head, path, host, port, websocket_generate_mask_key(session));
     if (subprotocol != NULL && remain_len > 0)
-    {
         head_len += websocket_snprintf(&ptr, &remain_len, "Sec-WebSocket-Protocol: %s\r\n", subprotocol);
-    }
 
     if (remain_len > (int)session->head_len)
-    {
         ws_memcpy(ptr, session->cache + session->cache_len - session->head_len, session->head_len);
-    }
 
     head_len += session->head_len;
     ptr += session->head_len;
@@ -529,15 +526,12 @@ static int websocket_send_hand_frame(struct websocket_session *session, const ch
     if (remain_len > 0)
     {
         if (websocket_send_nbytes(session, session->cache, head_len, 0) != head_len)
-        {
             res =  -WEBSOCKET_WRITE_ERROR;
-        }
     }
     else
     {
         res = -WEBSOCKET_ERROR;
     }
-
     session->head_len = 0;
 
     return res;
@@ -642,12 +636,10 @@ static int websocket_recv_and_check_hand_frame(struct websocket_session *session
     uint16_t check_value = 0;
     while (1)
     {
-        /* read a line from the header information. */
         rc = websocket_read_line(session, session->cache, session->cache_len);
         if (rc < 0)
             break;
 
-        /* End of headers is a blank line.  exit. */
         if (rc == 0)
             break;
         if ((rc == 1) && (session->cache[0] == '\r'))
@@ -693,7 +685,7 @@ static int webscoket_tls_init(struct websocket_session *session)
         success = -WEBSOCKET_NOMEM;
     }
 
-    return success == 1 ? WEBSOCKET_OK : success;
+    return success ? WEBSOCKET_OK : success;
 }
 
 int websocket_get_block_info_raw(struct websocket_session *session)
