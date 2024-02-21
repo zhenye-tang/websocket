@@ -112,14 +112,7 @@ static struct websocket_worker worker;
 
 int app_websocket_enter_critical(struct websocket *session)
 {
-    if (session)
-    {
-        return pthread_mutex_lock(&session->lock);
-    }
-    else
-    {
-        return -EINVAL;
-    }
+    return session ? pthread_mutex_lock(&session->lock) : -EINVAL;
 }
 
 void app_websocket_exit_critical(struct websocket *session)
@@ -421,16 +414,6 @@ int app_websocket_worker_init(void)
     pthread_mutex_init(&worker.lock, NULL);
     pthread_create(&worker.tid, NULL, worker_entry, &worker);
     return 0;
-}
-
-static int websocket_enter_critical(struct websocket *ws)
-{
-    return ws ? pthread_mutex_lock(&ws->lock) : -EINVAL;
-}
-
-static int websocket_exit_critical(struct websocket *ws)
-{
-    return ws ? pthread_mutex_unlock(&ws->lock) : -EINVAL;
 }
 
 void websocket_kv_table_deinit(struct websocket_kv_table *kv_tab)
