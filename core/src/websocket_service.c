@@ -356,7 +356,8 @@ static void *worker_entry(void *prma)
         {
             char recv[4];
             read(fds[0].fd, recv, 1);
-            recv[1] = '\0';
+            if(recv[0] == 'q')
+                break;
         }
         nfds = 1;
 
@@ -413,6 +414,15 @@ int app_websocket_worker_init(void)
     pipe(worker.pipe);
     pthread_mutex_init(&worker.lock, NULL);
     pthread_create(&worker.tid, NULL, worker_entry, &worker);
+    return 0;
+}
+
+int app_websocket_worker_deinit(void)
+{
+    write(worker.pipe[1], "q", 1);
+    pthread_join(worker.tid, NULL);
+    pthread_detach(worker.tid);
+    pthread_mutex_destroy(&worker.lock);
     return 0;
 }
 
@@ -540,7 +550,7 @@ int app_websocket_init(struct app_websocket *websocket)
     return success ? WEBSOCKET_OK : -WEBSOCKET_ERROR;
 }
 
-void websocket_deinit(struct app_websocket *websocket)
+void app_websocket_deinit(struct app_websocket *websocket)
 {
     if (websocket && websocket->websocket_session)
     {

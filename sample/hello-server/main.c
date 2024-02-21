@@ -13,6 +13,8 @@ static void ctrl_c(int s)
 {
     printf("byby!!!\n");
     app_websocket_disconnect_server(&ws);
+    sleep(1);
+    app_websocket_worker_deinit();
     exit(0);
 }
 
@@ -79,6 +81,7 @@ int main(int argc, char *argv[])
         {
             app_websocket_disconnect_server(&ws);
             sleep(1);
+            app_websocket_worker_deinit();
             success = 0;
         }
         else

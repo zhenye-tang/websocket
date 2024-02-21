@@ -49,6 +49,7 @@ struct app_websocket_frame
 };
 
 int app_websocket_worker_init(void);
+int app_websocket_worker_deinit(void);
 int app_websocket_init(struct app_websocket *ws);
 void app_websocket_deinit(struct app_websocket *ws);
 int app_websocket_set_url(struct app_websocket *ws, const char *url);
